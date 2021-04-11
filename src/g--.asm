@@ -160,7 +160,8 @@ CH_RET          RS      CHTOI
 ; Area de dados nova
 ; -------------------------------------------------------------------
 
-EOL             K       /0A0A ; end of line
+EOL             K       /000A ; end of line
+NULL            K       /0000 ; null
 
 ;Caracteres ASCII para analisador lexico
 
@@ -222,6 +223,7 @@ ENDEXEC         K       /0000 ; endereco de execucao
 ; -------------------------------------------------------------------
 ERRO_LEX        K       /0000   ; endereco de retorno
                 LD      ERLEX   ; carrega codigo de erro 
+                PD      /100    ; Printa
                 OS      /0EE    ; escreve na tela o erro (cmd OS)
                 HM      ERRO_LEX; para execucao
 
@@ -231,6 +233,7 @@ ERRO_LEX        K       /0000   ; endereco de retorno
 ; -------------------------------------------------------------------
 ERRO_SIN        K       /0000   ; endereco de retorno
                 LD      ERSIN   ; carrega codigo de erro 
+                PD      /100    ; Printa
                 OS      /0EE    ; escreve na tela o erro (cmd OS)
                 HM      ERRO_CMD; para execucao
 
@@ -240,6 +243,7 @@ ERRO_SIN        K       /0000   ; endereco de retorno
 ; -------------------------------------------------------------------
 ERRO_SEM        K       /0000   ; endereco de retorno
                 LD      ERSEM   ; carrega codigo de erro 
+                PD      /100    ; Printa
                 OS      /0EE    ; escreve na tela o erro (cmd OS)
                 HM      ERRO_CMD; para execucao
 
@@ -365,16 +369,24 @@ END_IS_EQUAL    RS      IS_EQUAL    ; retorna
 
 ; -------------------------------------------------------------------
 ; Subrotina: IS_BLANK
-; Verifica "/"
-; Retorna 0 se for "/" 
+; Verifica " " ou EOL ou NULL
+; Retorna 0 se for " " ou EOL ou NULL
 ; -------------------------------------------------------------------
 IS_BLANK        K       /0000       ; endereco de retorno
                 LD      LEX_WORD    ; Load LEX_WORD 
                 SB      C_SPACE     ; Subtrai " " 
-                JZ      OK5         ; Se LEX_WORD == ' ': jump pra OK4
-                LD      K_0001      ; Load um 
+                JZ      OK5         ; Se LEX_WORD == ' ': jump pra OK5
+NOT_OK          LD      K_0001      ; Load um 
                 JP      END_IS_BLANK; Jump pro retorno
-OK5             LD      K_0000      ; Load zero
+OK5             LD      LEX_WORD    ; Load LEX_WORD 
+                SB      EOL         ; Subtrai EOL 
+                JZ      OK6         ; Se LEX_WORD == EOL: jump pra OK6   
+                JP      NOT_OK      ; Jump pra NOT_OK
+OK6             LD      LEX_WORD    ; Load LEX_WORD 
+                SB      NULL        ; Subtrai NULL
+                JZ      OK7         ; Se LEX_WORD == NULL: jump pra OK7  
+                JP      NOT_OK      ; Jump pra NOT_OK
+OK7             LD      K_0000      ; Load zero
 END_IS_BLANK    RS      IS_BLANK    ; retorna
                 
 ; -------------------------------------------------------------------
@@ -431,13 +443,22 @@ END_IS_SPECIAL  RS      IS_0to9     ; Retorna
 LEX_CONT        K       /0000       ; Indica qual word da vez
 
 LEX_CALL        K       /0000       ; Endereco de retorno
-                ;Fazer um loop que lê cada palavra em PROGRAM
                 LD      K_0000      ; Load zero
                 MM      CURRENT_ADDR; Guarda no CURRENT_ADDR
-LEX_LOOP1       SC      READ_PROGRAM;
+                MM      LEX_STATE   ; Zera o estado da analise lexical
+LEX_LOOP        SC      READ_PROGRAM; Faz a leitura de duas letras do programa
                 SC      LEX_PARSE   ; Chama a rotina de parsing
-                ;APLICAR O LEX STEP NO LEX CALL
-                RS      LEX_CALL    ; Retorna 
+                LD      LEX_WORD1   ; Pega a primeira letra  
+                SC      LEX_STEP    ; Faz um passo da analise lexical para a primeira letra
+                LD      LEX_WORD2   ; Pega a segunda letra
+                SC      LEX_STEP    ; Faz um passo da analise lexical para a segunda letra
+                LD      CURRENT_ADDR; Carrega o proximo endereco a ser lido
+                SB      LAST_ADDR   ; Subtrai do ultimo endereco
+                JN      LEX_LOOP    ; Se for negativo, continue no Loop
+                JZ      LEX_LOOP    ; Se for 0, também continue no Loop
+                LD      K_0000      ; Se for positivo, carrega zero
+                MM      CURRENT_ADDR; Zera o endereco a ser lido
+                RS      LEX_CALL    ; Saia da analise lexical
 
 ; -------------------------------------------------------------------
 ; Subrotina: LEX_STEP
@@ -576,33 +597,21 @@ PROCESS         K       /0000   ; endereco de retorno
                 RS      PROCESS ; retorna
 
 ; -------------------------------------------------------------------
-; Subrotina: INITJOB
+; Subrotina: INIT
 ; Verifica "//"
 ; Retorna 0 se for "//" 
 ; -------------------------------------------------------------------
-INITJOB         K       /0000       ; endereco de retorno
-                SC      CHECK_HEAD  ; subrotina verifica //JB
-                JZ      LOOP1       ; se for zero (nao deu erro), jump para LOOP1
-                JP      FIM_INITJOB ; se der erro, jump pro FIM_INITJOB
-LOOP1           SC      LEITURA     ; subrotina de leitura
-                SC      CHECK_2BARS ; subrotina verifica //
-                JZ      FLAG1       ; se for zero (nao deu erro), jump para FLAG1
-                SC      ERRO_CMD    ; se deu erro, chama subrotina ERRO_CMD
-FLAG1           SC      CHECK_CMD   ; chama subrotina para checar comando
-                JZ      FIM_INITJOB ; se for zero, jump pro FIM_INITJOB
-                SC      LEITURA     ; chama subrotina de LEITURA
-                SB      EOL         ; subtrai EOL
-                JZ      FLAG2       ; se for EOL, jump pra FLAG2  
-                SC      ERRO_ARG    ; caso contrario, chama erro 
-FLAG2           SC      CHECK_FIMJ  ; chama subrotina verifica fim do job
-                JZ      FIM_INITJOB ; se terminou, pula para FIM_INITJOB
-                JP      LOOP1       ; caso contrario, volta pro LOOP1
+INIT            K       /0000       ; endereco de retorno
+                SC      LEITURA_TOTAL; Faz a leitura total
+                SC      LEX_CALL    ; Chama LEX_CALL
+                LD      K_0001      ; Load 1
+                PD      /100        ; Printa
 FIM_INITJOB     RS      INITJOB     ; retorna
 
 ; -------------------------------------------------------------------
 ; MAIN FUNCTION
 ; -------------------------------------------------------------------
-INI             SC      INITJOB     ; Jump pro comeco do Job
+INI             SC      INIT        ; Jump pro comeco
 FIM             HM      FIM         ; Fim do programa
 
 PROGRAMPTR      K       PROGRAM     ; Ponteiro que aponta para o inicio do programa
