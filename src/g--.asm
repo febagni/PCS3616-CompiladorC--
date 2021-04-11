@@ -530,7 +530,7 @@ LEX_STATE2      SC      IS_BLANK    ; No estado 2, checa se for espaco
                 JZ      L_SX_BLANK  ; Se for espaco, vai para L_SX_BLANK
                 SC      IS_0to9     ;
                 JZ      LEX_END_STEP; Se for 0 ate 9, mantém no estado 2
-                SC      ERRO_LEX    ; Da erro se nao for nenhum
+                SC      ERRO_LEX    ; Da erro se nao for nenhuma
 
 LEX_STATE3      LD      LEX_WORD    ; No estado 3, checa se for end of line
                 SB      EOL         ;
@@ -588,6 +588,75 @@ LEX_PARSE       K       /0000       ; Endereco de retorno
                 DV      SHIFT       ; Shifta para a direita
                 MM      LEX_WORD2   ; Armazena a segunda palavra lida
                 RS      LEX_PARSE   ; Retorna  
+
+; -------------------------------------------------------------------
+; Subrotina: READ_WORD
+; Lê uma palavra entre espaços
+; -------------------------------------------------------------------
+
+WORD_ADDR       K       /0000           ; Endereco da dupla de letras que está sendo lida
+READ_WORD       K       /0000           ; Endereco de retorno
+                LD      WORDPTR         ; Carrega o ponteiro da palavra
+                MM      WORD_ADDR       ; Coloca o endereco atual como ponteiro
+                AD      CMD_MM          ; Adiciona comando de Move to Memory
+                MM      READ_1ST_WORD   ; Escreve o comando em READ_WORD_MM
+FIRSTWORDLOOP   SC      READ_PROGRAM    ; Chama a subrotina READ_PROGRAM
+READ_1ST_WORD   K       /0000           ; Armazena a palavra no ponteiro
+                SC      LEX_PARSE       ; Divide em duas letras
+                LD      LEX_WORD2       ; Carrega a segunda letra
+                SC      IS_BLANK        ; Se a segunda letra for espaco
+                JZ      POSSIBLYBLANK   ; Desvia para o POSSIBLYBLANK
+                LD      WORD_ADDR       ; Se nao for espaco, carregar o endereco
+                AD      K_0002          ; Adicionar 2 (proximo endereco)
+                JP      READ_WORD_LOOP  ; Entrar no LOOP
+
+POSSIBLYBLANK   LD      LEX_WORD1       ; Carrega a primeira letra
+                SC      IS_BLANK        ; Se a primeira E a segunda letra forem vazias...
+                JZ      FIRSTWORDLOOP   ; Pega a proxima palavra
+                JP      END_WORD2       ; Encerra subrotina
+
+READ_WORD_LOOP  MM      WORD_ADDR       ; Coloca o endereco atual como ponteiro
+                AD      CMD_MM          ; Adiciona comando de Move to Memory
+                MM      READ_WORD_MM    ; Escreve o comando em READ_WORD_MM
+                MM      WRITE_BLANK     ; Escreve o comando em WRITE_BLANK
+                SC      READ_PROGRAM    ; Chama a subrotina READ_PROGRAM
+READ_WORD_MM    K       /0000           ; Mover o conjunto de duas letras para o ponteiro
+                SC      LEX_PARSE       ; Dividir as duas letras
+                LD      LEX_WORD1       ; Analisa a primeira letra
+                SC      IS_BLANK        ; Se a primeira letra for blank...
+                JZ      END_WORD1       ; Desvia para END_WORD1
+                LD      LEX_WORD2       ; Analisa a segunda letra
+                SC      IS_BLANK        ; Se a segunda letra for blank...
+                JZ      END_WORD2       ; Desvia para END_WORD2
+                LD      WORD_ADDR       ; Se nenhuma for blank, carrega o endereco
+                SB      LASTWORDADDR    ; Subtrai do ultimo endereco
+                JZ      TOOBIG          ; Se for 0, quer dizer que a palavra ainda nao acabou mas chegou no limite, entao eh grande demais
+                LD      WORD_ADDR       ; Se nao for 0, carregar o endereco
+                AD      K_0002          ; Adicionar 2 (proximo endereco)
+                JP      READ_WORD_LOOP  ; Retornar ao LOOP
+
+END_WORD1       LD      C_SPACE         ; Se a primeira letra for blank, queremos ignorar a segunda letra
+                ML      SHIFT           ; Carrega " " e null
+WRITE_BLANK     K       /0000           ; Armazena isso no ponteiro
+                LD      CURRENT_ADDR    ; Carrega o current address
+                SB      K_0002          ; Volta o current address para ler a segunda letra depois
+                JP      END_WORD2       ; Encerra subrotina
+
+END_WORD2       RS      READ_WORD       ;
+
+TOOBIG          XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX CHAMAR ERRO XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+WORDPTR         K       /WORDADDR ;
+WORDADDR        K       /0000     ;
+                K       /0000     ;
+                K       /0000     ;
+                K       /0000     ;
+                K       /0000     ;
+                K       /0000     ;
+                K       /0000     ;
+                K       /0000     ;
+                K       /0000     ;
+LASTWORDADDR    K       /0000     ;
 
 ; -------------------------------------------------------------------
 ; Subrotina: PROCESS
