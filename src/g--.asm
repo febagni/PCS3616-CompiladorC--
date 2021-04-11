@@ -2,8 +2,8 @@
 ; Programa principal do Compilador de C--
 ; -------------------------------------------------------------------
 
-; Origem relocável
-                &       /0000
+; Origem absoluta
+                @       /0000
 
 MAIN            JP      INI      ; salta para o início do programa
 UL              K       /0000    ; parâmetro: UL onde está o arquivo code.cmm
@@ -165,6 +165,7 @@ NULL            K       /0000 ; null
 
 ;Caracteres ASCII para analisador lexico
 
+C_MONEY         K       /0024 ; Cte "$" em ASCII
 C_PLUS          K       /002B ; Cte "+" em ASCII
 C_MINUS         K       /002D ; Cte "-" em ASCII
 C_MULT          K       /002A ; Cte "*" em ASCII
@@ -200,6 +201,8 @@ K_0001          K       /0001 ; cte 0x0001
 K_0002          K       /0002 ; cte 0x0002
 K_0003          K       /0003 ; cte 0x0003
 K_0004          K       /0004 ; cte 0x0004
+K_0005          K       /0005 ; cte 0x0005
+K_0006          K       /0006 ; cte 0x0006
 
 CMD_LD          K       /8000 ; Instrucao LD (LOAD)
 CMD_MM          K       /9000 ; Instrucao MM (Move to Memory)
@@ -235,7 +238,7 @@ ERRO_SIN        K       /0000   ; endereco de retorno
                 LD      ERSIN   ; carrega codigo de erro 
                 PD      /100    ; Printa
                 OS      /0EE    ; escreve na tela o erro (cmd OS)
-                HM      ERRO_CMD; para execucao
+                HM      ERRO_SIN; para execucao
 
 ; -------------------------------------------------------------------
 ; Subrotina: ERRO_SEM
@@ -245,7 +248,7 @@ ERRO_SEM        K       /0000   ; endereco de retorno
                 LD      ERSEM   ; carrega codigo de erro 
                 PD      /100    ; Printa
                 OS      /0EE    ; escreve na tela o erro (cmd OS)
-                HM      ERRO_CMD; para execucao
+                HM      ERRO_SEM; para execucao
 
 ; -------------------------------------------------------------------
 ; Subrotina: LEITURA
@@ -253,7 +256,7 @@ ERRO_SEM        K       /0000   ; endereco de retorno
 ; -------------------------------------------------------------------
 LEITURA         K       /0000   ; endereco de retorno
                 LD      ULJOB   ; faz o load do local do arquivo batch para leitura
-                AD      LER     ; soma a instrucao de leitura (GD = GETDATA)
+                AD      CMD_GD  ; soma a instrucao de leitura (GD = GETDATA)
                 MM      LENDO   ; guarda na endereco LENDO
 LENDO           K       /0000   ; faz a leitura
                 RS      LEITURA ; retorna
@@ -267,7 +270,7 @@ R_ADD           K       /0000       ; Endereco da ultima escrita
 LEITURA_TOTAL   K       /0000       ; Endereco de retorno 
                 LV      /000        ; Carrega 0 no acumulador
                 MM      R_ADD       ; Coloca 0 no endereco da escrita
-READ_LOOP       AD      MM_CMD      ; Adiciona com o comando de adicionar na memoria.
+READ_LOOP       AD      CMD_MM      ; Adiciona com o comando de adicionar na memoria.
                 AD      PROGRAMPTR  ; Adiciona ao endereco PROGRAM
                 MM      MM_PROG     ; Armazena o comando para colocar no programa
                 SC      LEITURA     ; chama subrotina de LEITURA atomica
@@ -375,17 +378,15 @@ END_IS_EQUAL    RS      IS_EQUAL    ; retorna
 IS_BLANK        K       /0000       ; endereco de retorno
                 LD      LEX_WORD    ; Load LEX_WORD 
                 SB      C_SPACE     ; Subtrai " " 
-                JZ      OK5         ; Se LEX_WORD == ' ': jump pra OK5
-NOT_OK          LD      K_0001      ; Load um 
-                JP      END_IS_BLANK; Jump pro retorno
+                JZ      OK7         ; Se LEX_WORD == ' ': jump pra OK7
 OK5             LD      LEX_WORD    ; Load LEX_WORD 
                 SB      EOL         ; Subtrai EOL 
-                JZ      OK6         ; Se LEX_WORD == EOL: jump pra OK6   
-                JP      NOT_OK      ; Jump pra NOT_OK
+                JZ      OK7         ; Se LEX_WORD == EOL: jump pra OK6   
 OK6             LD      LEX_WORD    ; Load LEX_WORD 
                 SB      NULL        ; Subtrai NULL
                 JZ      OK7         ; Se LEX_WORD == NULL: jump pra OK7  
-                JP      NOT_OK      ; Jump pra NOT_OK
+NOT_OK          LD      K_0001      ; Load um 
+                JP      END_IS_BLANK; Jump pro retorno
 OK7             LD      K_0000      ; Load zero
 END_IS_BLANK    RS      IS_BLANK    ; retorna
                 
@@ -433,7 +434,7 @@ IS_SPECIAL      K       /0000       ; Endereco de Retorno
 NAO_EH3         LD      K_0001      ; Load um 
                 JP      END_IS_SPECIAL ; Jump pro retorno
 OK2             LD      K_0000      ; Load zero
-END_IS_SPECIAL  RS      IS_0to9     ; Retorna  
+END_IS_SPECIAL  RS      IS_SPECIAL  ; Retorna  
 
                 
 ; -------------------------------------------------------------------
@@ -453,6 +454,7 @@ LEX_LOOP        SC      READ_PROGRAM; Faz a leitura de duas letras do programa
                 LD      LEX_WORD2   ; Pega a segunda letra
                 SC      LEX_STEP    ; Faz um passo da analise lexical para a segunda letra
                 LD      CURRENT_ADDR; Carrega o proximo endereco a ser lido
+                AD      PROGRAMPTR  ; Soma com o ponteiro
                 SB      LAST_ADDR   ; Subtrai do ultimo endereco
                 JN      LEX_LOOP    ; Se for negativo, continue no Loop
                 JZ      LEX_LOOP    ; Se for 0, também continue no Loop
@@ -484,7 +486,7 @@ LEX_STEP        K       /0000       ; Entrada do subrotina
                 JZ      LEX_STATE5  ; Desvia se o estado for 5
                 SB      K_0001      ;
                 JZ      LEX_STATE6  ; Desvia se o estado for 5
-                chama o erro gostoso
+                SC      ERRO_LEX    ; Da erro se nao for nenhum desses
                               
 LEX_STATE0      SC      IS_BLANK    ; No estado 0, checa se for 0
                 JZ      LEX_END_STEP; Se for 0, mantém o estado
@@ -549,6 +551,10 @@ LEX_STATE5      SC      IS_BLANK    ; Checa se eh espaco
                 JZ      L_S5_BAR    ; Se tiver uma barra, vai para L_S5_BAR
                 SC      ERRO_LEX    ; Se nao for barra, da erro
 
+L_S5_BAR        LD      K_0003      ; Carrega 3
+                MM      LEX_STATE   ; Coloco o estado da LEX para 3
+                JP      LEX_END_STEP; Encerra o passo da analise lexical 
+
 LEX_STATE6      SC      IS_EQUAL    ; Checa se eh =
                 JZ      L_S6_EQUAL  ; Se for =, desvia para L_S6_EQUAL
                 SC      IS_BLANK    ; Checa se eh espaco
@@ -604,9 +610,9 @@ PROCESS         K       /0000   ; endereco de retorno
 INIT            K       /0000       ; endereco de retorno
                 SC      LEITURA_TOTAL; Faz a leitura total
                 SC      LEX_CALL    ; Chama LEX_CALL
-                LD      K_0001      ; Load 1
+                LD      C_MONEY     ; Load $
                 PD      /100        ; Printa
-FIM_INITJOB     RS      INITJOB     ; retorna
+FIM_INITJOB     RS      INIT     ; retorna
 
 ; -------------------------------------------------------------------
 ; MAIN FUNCTION
