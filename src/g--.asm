@@ -596,6 +596,66 @@ LEX_PARSE       K       /0000       ; Endereco de retorno
                 RS      LEX_PARSE   ; Retorna  
 
 ; -------------------------------------------------------------------
+; Subrotina:  ADJUST_WORD
+; Ajusta posicionamento da palavra se necessário;
+; -------------------------------------------------------------------
+
+ADJUSTED        K       /0000           ; Palavra normalizada
+ADJUST_WORD     K       /0000           ; Endereco de retorno da subrotina
+                LD      WORDPTR         ; Carrega o ponteiro da palavra
+                MM      WORD_ADDR       ; Coloca o endereco atual como ponteiro
+                AD      CMD_LD          ; Soma com o comando de LOAD
+                MM      READ_1ST_WORD   ; Escreve o comando em READ_1ST_WORD
+READ_1ST_WORD   K       /0000           ; Armazena a palavra no ponteiro
+                SC      LEX_PARSE       ; Divide em duas letras
+                LD      LEX_WORD1       ; Carrega a primeira
+                SC      IS_BLANK        ; Se a primeira letra for espaco
+                JZ      SHIFT_THE_WORD  ; Faz a rotina de shift
+RETURN_ADJUST   LD      K_0000          ; Load zero 
+END_ADJUST      RS      ADJUST_WORD     ;
+
+SHIFT_THE_WORD  LD      LEX_WORD2       ; Carrega a segunda letra
+                ML      SHIFT           ; Shifta a segunda letra para a esquerda (transforma em primeira letra)
+                MM      ADJUSTED        ; Armazena a nova primeira letra
+ADJUST_LOOP     LD      WORD_ADDR       ; Carregar o WORD_ADDR
+                AD      CMD_MM          ; Somar com o comando de MOVE TO MEMORY
+                MM      WRITE_ADJUSTED  ; Escrever esse comando em WRITE_ADJUSTED
+                MM      WRITE_LAST_ADJ  ; Escrever esse comando em WRITE_LAST_ADJ
+                LD      WORD_ADDR       ; Carregar WORD_ADDR
+                AD      K_0002          ; Somar 2 (proximo ADDR)
+                MM      WORD_ADDR       ; Armazenar no WORD_ADDR
+                AD      CMD_LD          ; Somar com o comando de LOAD
+                MM      READ_NEXT_WORD  ; Escrever esse comando em READ_NEXT_WORD
+READ_NEXT_WORD  K       /0000           ; Le a proxima palavra
+                SC      LEX_PARSE       ; Divide em duas letras
+                LD      LEX_WORD1       ; Carrega a primeira
+                SC      IS_BLANK        ; A primeira eh blank?
+                JZ      ADJ_WORD1_BLANK ; Se sim, vai para ADJ_WORD1_BLANK 
+                LD      LEX_WORD1       ; Se nao, carrega a letra novamente
+                AD      ADJUSTED        ; Soma com o adjusted
+WRITE_ADJUSTED  K       /0000           ; Escreve essa nova dupla de letras.
+                LD      LEX_WORD2       ; Carrega a letra que sobrou
+                SC      IS_BLANK        ; A letra que sobrou eh blank?
+                JZ      ADJ_WORD2_BLANK ; Se sim, vai para ADJ_WORD2_BLANK
+                LD      LEX_WORD2       ; Carrega LEX_WORD2 novamente
+                ML      SHIFT           ; Shifta dois para a esquerda
+                MM      ADJUSTED        ; Armazena em ADJUSTED
+                JP      ADJUST_LOOP     ; Retorna ao LOOP
+
+ADJ_WORD1_BLANK LD      LEX_WORD1       ; Carrega o blank
+                AD      ADJUSTED        ; Junta com o que tinha sido lido
+WRITE_LAST_ADJ  K       /0000           ; Escreve no vetor
+                JP      RETURN_ADJUST   ; Encerra.
+
+ADJ_WORD2_BLANK LD      WORD_ADDR       ; Carregar o WORD_ADDR
+                AD      CMD_MM          ; Somar com o comando de MM
+                MM      WRITE_ADJ_BLANK ; Escrever esse comando na linha seguinte
+                LD      LEX_WORD2       ; Carrega o LEX_WORD2
+                ML      SHIFT           ; Shifta 2 para a esquerda
+WRITE_ADJ_BLANK K       /0000           ; Escrever o blank e o null no vetor de letras
+                JP      RETURN_ADJUST   ; Encerra.
+
+; -------------------------------------------------------------------
 ; Subrotina: READ_WORD
 ; Lê uma palavra entre espaços
 ; -------------------------------------------------------------------
@@ -605,28 +665,28 @@ READ_WORD       K       /0000           ; Endereco de retorno
                 LD      WORDPTR         ; Carrega o ponteiro da palavra
                 MM      WORD_ADDR       ; Coloca o endereco atual como ponteiro
                 AD      CMD_MM          ; Adiciona comando de Move to Memory
-                MM      READ_1ST_WORD   ; Escreve o comando em READ_WORD_MM
+                MM      WRITE_1ST_WORD  ; Escreve o comando em WRITE_1ST_WORD
 FIRSTWORDLOOP   SC      READ_PROGRAM    ; Chama a subrotina READ_PROGRAM
-READ_1ST_WORD   K       /0000           ; Armazena a palavra no ponteiro
+WRITE_1ST_WORD  K       /0000           ; Armazena a palavra no ponteiro
                 SC      LEX_PARSE       ; Divide em duas letras
                 LD      LEX_WORD2       ; Carrega a segunda letra
                 SC      IS_BLANK        ; Se a segunda letra for espaco
                 JZ      POSSIBLYBLANK   ; Desvia para o POSSIBLYBLANK
                 LD      WORD_ADDR       ; Se nao for espaco, carregar o endereco
                 AD      K_0002          ; Adicionar 2 (proximo endereco)
-                JP      READ_WORD_LOOP  ; Entrar no LOOP
+                JP      WRITE_WORD_LOOP  ; Entrar no LOOP
 
 POSSIBLYBLANK   LD      LEX_WORD1       ; Carrega a primeira letra
                 SC      IS_BLANK        ; Se a primeira E a segunda letra forem vazias...
                 JZ      FIRSTWORDLOOP   ; Pega a proxima palavra
                 JP      END_WORD2       ; Encerra subrotina
 
-READ_WORD_LOOP  MM      WORD_ADDR       ; Coloca o endereco atual como ponteiro
+WRITE_WORD_LOOP MM      WORD_ADDR       ; Coloca o endereco atual como ponteiro
                 AD      CMD_MM          ; Adiciona comando de Move to Memory
-                MM      READ_WORD_MM    ; Escreve o comando em READ_WORD_MM
+                MM      WRITE_WORD_MM   ; Escreve o comando em WRITE_WORD_MM
                 MM      WRITE_BLANK     ; Escreve o comando em WRITE_BLANK
                 SC      READ_PROGRAM    ; Chama a subrotina READ_PROGRAM
-READ_WORD_MM    K       /0000           ; Mover o conjunto de duas letras para o ponteiro
+WRITE_WORD_MM   K       /0000           ; Mover o conjunto de duas letras para o ponteiro
                 SC      LEX_PARSE       ; Dividir as duas letras
                 LD      LEX_WORD1       ; Analisa a primeira letra
                 SC      IS_BLANK        ; Se a primeira letra for blank...
@@ -639,20 +699,22 @@ READ_WORD_MM    K       /0000           ; Mover o conjunto de duas letras para o
                 JZ      TOOBIG          ; Se for 0, quer dizer que a palavra ainda nao acabou mas chegou no limite, entao eh grande demais
                 LD      WORD_ADDR       ; Se nao for 0, carregar o endereco
                 AD      K_0002          ; Adicionar 2 (proximo endereco)
-                JP      READ_WORD_LOOP  ; Retornar ao LOOP
+                JP      WRITE_WORD_LOOP ; Retornar ao LOOP
 
 END_WORD1       LD      C_SPACE         ; Se a primeira letra for blank, queremos ignorar a segunda letra
+                DV      SHIFT           ; Carrega null e " "
                 ML      SHIFT           ; Carrega " " e null
 WRITE_BLANK     K       /0000           ; Armazena isso no ponteiro
                 LD      CURRENT_ADDR    ; Carrega o current address
                 SB      K_0002          ; Volta o current address para ler a segunda letra depois
                 JP      END_WORD2       ; Encerra subrotina
 
-END_WORD2       RS      READ_WORD       ; Retorna da subrotina
+END_WORD2       SC      ADJUST_WORD     ; Ajusta a palavra lida
+                RS      READ_WORD       ; Retorna da subrotina
 
 TOOBIG          SC      ERRO_SIN        ; Chama erro sintatico 
 
-WORDPTR         K       /WORDADDR ; Ponteiro que aponta para a palavra lida
+WORDPTR         K       WORDADDR ; Ponteiro que aponta para a palavra lida
 WORDADDR        K       /0000     ; Palavra que está sendo lido
                 K       /0000     ;
                 K       /0000     ;
@@ -771,6 +833,6 @@ FIM             HM      FIM         ; Fim do programa
 
 PROGRAMPTR      K       PROGRAM     ; Ponteiro que aponta para o inicio do programa
 LAST_ADDR       K       /0000       ;
-PROGRAM         K       /0000       ; Salva o progama lido
+PROGRAM         K       /0000       ; Salva o programa lido
 
 # MAIN
