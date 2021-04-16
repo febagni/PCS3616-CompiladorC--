@@ -192,6 +192,12 @@ C_Z_MSCLO       K       /005A ; Cte "Z" em ASCII
 C_A_MNSCLO      K       /0061 ; Cte "a" em ASCII 
 C_Z_MNSCLO      K       /007A ; Cte "z" em ASCII 
 
+PTR_char        K       C_char_c  ; Ponteiro para char
+C_char_c        K       /0063 ; Cte "c" em ASCII
+C_char_h        K       /0068 ; Cte "h" em ASCII
+C_char_a        K       /0061 ; Cte "a" em ASCII
+C_char_r        K       /0072 ; Cte "r" em ASCII
+
 K_00FF          K       /00FF ; cte 0x00FF
 K_0FFE          K       /0FFE ; cte 0x0FFE
 K_0800          K       /0800 ; cte 0x0800
@@ -642,12 +648,12 @@ WRITE_BLANK     K       /0000           ; Armazena isso no ponteiro
                 SB      K_0002          ; Volta o current address para ler a segunda letra depois
                 JP      END_WORD2       ; Encerra subrotina
 
-END_WORD2       RS      READ_WORD       ;
+END_WORD2       RS      READ_WORD       ; Retorna da subrotina
 
-TOOBIG          XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX CHAMAR ERRO XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+TOOBIG          SC      ERRO_SIN        ; Chama erro sintatico 
 
-WORDPTR         K       /WORDADDR ;
-WORDADDR        K       /0000     ;
+WORDPTR         K       /WORDADDR ; Ponteiro que aponta para a palavra lida
+WORDADDR        K       /0000     ; Palavra que está sendo lido
                 K       /0000     ;
                 K       /0000     ;
                 K       /0000     ;
@@ -657,6 +663,80 @@ WORDADDR        K       /0000     ;
                 K       /0000     ;
                 K       /0000     ;
 LASTWORDADDR    K       /0000     ;
+
+; -------------------------------------------------------------------
+; Subrotina: SET_WORD
+; Subrotina que escreve uma palavra no endereco contido no acumulador
+; PARAM: WORD_TO_WRITE palavra a ser escrita no endereco contido no acumulador 
+; -------------------------------------------------------------------
+
+WORD_TO_WRITE   K       /0000         ; Palavra a ser escrita
+
+SET_WORD        K       /0000         ; Endereco de entrada da subrotina
+                AD      CMD_MM        ; Soma endereco no acumulador ao comando de MM
+                MM      S_WORD        ; Armazena no comando em S_WORD
+                LD      WORD_TO_WRITE ; Carrega a palavra a ser escrita
+S_WORD          K       /0000         ; Espaco reservado para o comando de leitura da memoria
+                RS      SET_WORD      ; Retorna da subrotina
+                
+; -------------------------------------------------------------------
+; Subrotina: GET_WORD
+; Subrotina que pega a palavra localizada no endereco contido no acumulador
+; -------------------------------------------------------------------
+
+GET_WORD        K       /0000     ; Endereco de entrada da subrotina
+                AD      CMD_LD    ; Soma endereco no acumulador ao comando de LD
+                MM      G_WORD    ; Armazena no comando em G_WORD
+G_WORD          K       /0000     ; Espaco reservado para o comando de leitura da memoria
+                RS      GET_WORD  ; Retorna da subrotina
+
+; -------------------------------------------------------------------
+; Subrotina: FIRST_LETTER_BLANK
+; Verifica se a primeira letra de uma palavra é BLANK: retorna 0 se eh BLANK, 1 se nao eh
+; -------------------------------------------------------------------
+
+FIRST_LETTER_BLANK  K   /0000       ; Endereco de entrada da funcao
+                    SC  LEX_PARSE   ; Divide a palavra em dois
+                    LD  LEX_WORD1   ; Pega a primeira letra
+                    SC  IS_BLANK    ; Verifica se é Blank
+                    RS  FIRST_LETTER_BLANK ; Retorna 1
+
+; -------------------------------------------------------------------
+; Subrotina: IS_CHAR
+; Verifica se palavra=="char"
+; Retorna 0 se for
+; -------------------------------------------------------------------
+LETRA_ATUAL     K       /0000       ; letra atual pra comparacao
+GABARITO        K       /0000       ; gabarito 
+PTR_ATUAL       K       /0000       ; ponteiro atual 
+
+IS_CHAR         K       /0000       ; endereco de retorno
+                LD      K_0000      ; load zero
+                MM      PTR_ATUAL   ; Zera ponteiro atual 
+CHAR_LOOP       LD      WORDPTR     ; Load WORDPTR
+                AD      PTR_ATUAL   ; pontiero atual 
+                SC      GET_WORD    ; Le 
+                MM      LETRA_ATUAL ; Guarda em letra atual 
+                LD      PTR_char    ; 
+                AD      PTR_ATUAL   ;
+                SC      GET_WORD    ;
+                MM      GABARITO    ; 
+                SB      LETRA_ATUAL ;
+                JZ      ATT_PTR     ;
+                JP      NOT_CHAR    ;
+ATT_PTR         LD      K_0002      ;
+                AD      PTR_ATUAL   ;
+                MM      PTR_ATUAL   ;
+                AD      LASTWORDADDR;
+                SB      WORDPTR     ;
+                JZ      EH_CHAR     ;
+                JP      CHAR_LOOP   ;
+
+NOT_CHAR        LD      K_0001      ;
+                RS      IS_CHAR     ;
+
+EH_CHAR         LD      K_0000      ;
+                RS      IS_CHAR     ;
 
 ; -------------------------------------------------------------------
 ; Subrotina: PROCESS
