@@ -192,11 +192,39 @@ C_Z_MSCLO       K       /005A ; Cte "Z" em ASCII
 C_A_MNSCLO      K       /0061 ; Cte "a" em ASCII 
 C_Z_MNSCLO      K       /007A ; Cte "z" em ASCII 
 
-PTR_char        K       C_char_c  ; Ponteiro para char
-C_char_c        K       /0063 ; Cte "c" em ASCII
-C_char_h        K       /0068 ; Cte "h" em ASCII
-C_char_a        K       /0061 ; Cte "a" em ASCII
-C_char_r        K       /0072 ; Cte "r" em ASCII
+PTR_char        K       C_char_ch     ; Ponteiro para char
+PTR_char_end    K       C_char_end    ; Ponteiro para o fim de char
+C_char_ch       K       /6368 ; Cte "ch" em ASCII
+C_char_ar       K       /6172 ; Cte "ar" em ASCII
+C_char_end      K       /2000 ; Cte " " e null em ASCII
+
+PTR_int         K       C_int_in      ; Ponteiro para int
+PTR_int_end     K       C_int_t_end   ; Ponteiro para o fim de int
+C_int_in        K       /696E ; Cte "in" em ASCII
+C_int_t_end     K       /7420 ; Cte "t_" em ASCII
+
+PTR_scan         K       C_scan_sc    ; Ponteiro para scan
+PTR_scan_end     K       C_scan_end   ; Ponteiro para o fim de scan
+C_scan_sc        K       /7363 ; Cte "sc" em ASCII
+C_scan_an        K       /616E ; Cte "an" em ASCII
+C_scan_end       K       /2000 ; Cte " " e null em ASCII
+
+PTR_if           K       C_if_if  ; Ponteiro para char
+PTR_if_end       K       C_if_end ; Ponteiro para o fim de if
+C_if_if          K       /6966   ; Cte "if" em ASCII
+C_if_end         K       /2000   ; Cte " " e null em ASCII
+
+PTR_goto         K       C_goto_go    ; Ponteiro para goto
+PTR_goto_end     K       C_goto_end   ; Ponteiro para o fim de goto
+C_goto_go        K       /676F ; Cte "go" em ASCII
+C_goto_to        K       /746F ; Cte "to" em ASCII
+C_goto_end       K       /2000 ; Cte " " e null em ASCII
+
+PTR_print        K       C_print_pr     ; Ponteiro para print
+PTR_print_end    K       C_print_t_end  ; Ponteiro para o end de print
+C_print_pr       K       /7072 ; Cte "pr" em ASCII
+C_print_in       K       /696E ; Cte "in" em ASCII
+C_print_t_end    K       /7420 ; Cte "t_" em ASCII
 
 K_00FF          K       /00FF ; cte 0x00FF
 K_0FFE          K       /0FFE ; cte 0x0FFE
@@ -364,8 +392,8 @@ END_IS_BAR      RS      IS_BAR      ; retorna
 
 ; -------------------------------------------------------------------
 ; Subrotina: IS_EQUAL
-; Verifica "/"
-; Retorna 0 se for "/" 
+; Verifica "="
+; Retorna 0 se for "=" 
 ; -------------------------------------------------------------------
 IS_EQUAL        K       /0000       ; endereco de retorno
                 LD      LEX_WORD    ; Load LEX_WORD 
@@ -599,7 +627,6 @@ LEX_PARSE       K       /0000       ; Endereco de retorno
 ; Subrotina:  ADJUST_WORD
 ; Ajusta posicionamento da palavra se necessário;
 ; -------------------------------------------------------------------
-
 ADJUSTED        K       /0000           ; Palavra normalizada
 ADJUST_WORD     K       /0000           ; Endereco de retorno da subrotina
                 LD      WORDPTR         ; Carrega o ponteiro da palavra
@@ -756,7 +783,6 @@ G_WORD          K       /0000     ; Espaco reservado para o comando de leitura d
 ; Subrotina: FIRST_LETTER_BLANK
 ; Verifica se a primeira letra de uma palavra é BLANK: retorna 0 se eh BLANK, 1 se nao eh
 ; -------------------------------------------------------------------
-
 FIRST_LETTER_BLANK  K   /0000       ; Endereco de entrada da funcao
                     SC  LEX_PARSE   ; Divide a palavra em dois
                     LD  LEX_WORD1   ; Pega a primeira letra
@@ -764,41 +790,127 @@ FIRST_LETTER_BLANK  K   /0000       ; Endereco de entrada da funcao
                     RS  FIRST_LETTER_BLANK ; Retorna 1
 
 ; -------------------------------------------------------------------
-; Subrotina: IS_CHAR
+; Subrotina: COMPARE_WORD
+; Compara a palavra lida com alguma palavra tabelada
+; Retorna 0 se for, 1 se nao forem iguais
+; Parametros: PTR_COMPARE - Endereco inicial da palavra tabelada
+;             PTR_COMP_END - Endereco final da palavra tabelada
+; -------------------------------------------------------------------
+
+LETRA_ATUAL     K       /0000         ; letra atual pra comparacao
+GABARITO        K       /0000         ; gabarito 
+PTR_ATUAL       K       /0000         ; ponteiro atual 
+
+PTR_COMPARE     K       /0000         ;
+PTR_COMP_END    K       /0000         ;
+
+COMPARE_WORD    K       /0000         ; endereco de retorno
+                LD      K_0000        ; load zero
+                MM      PTR_ATUAL     ; Zera ponteiro atual 
+COMPARE_LOOP    LD      WORDPTR       ; Load WORDPTR
+                AD      PTR_ATUAL     ; ponteiro atual 
+                SC      GET_WORD      ; Le 
+                MM      LETRA_ATUAL   ; Guarda em letra atual 
+                LD      PTR_COMPARE   ; 
+                AD      PTR_ATUAL     ;
+                SC      GET_WORD      ;
+                MM      GABARITO      ;
+                SB      LETRA_ATUAL   ;
+                JZ      ATT_PTR       ;
+                JP      COMPARE_DIFF  ;
+ATT_PTR         LD      GABARITO      ;
+                SB      PTR_COMP_END  ;
+                JZ      COMPARE_EQU   ;
+                LD      K_0002        ;
+                AD      PTR_ATUAL     ;
+                MM      PTR_ATUAL     ;
+                JP      COMPARE_LOOP  ;
+
+COMPARE_DIFF    LD      K_0001        ;
+                RS      COMPARE_WORD  ;
+
+COMPARE_EQU     LD      K_0000        ;
+                RS      COMPARE_WORD  ;
+
+; -------------------------------------------------------------------
+; Subrotina: IS_int
+; Verifica se palavra == "int"
+; Retorna 0 se for
+; -------------------------------------------------------------------
+
+IS_int          K       /0000         ; Entrada da subrotina
+                LD      PTR_int       ; Carrega o ponteiro que aponta para o int
+                MM      PTR_COMPARE   ; Armazena no parametro
+                LD      PTR_int_end   ; Carrega o ponteiro que aponta para o fim de int
+                MM      PTR_COMP_END  ; Armazena no parametro
+                SC      COMPARE_WORD  ; Chama a subrotina comparacao
+                RS      IS_int        ; Retorno da subrotina
+
+; -------------------------------------------------------------------
+; Subrotina: IS_char
 ; Verifica se palavra=="char"
 ; Retorna 0 se for
 ; -------------------------------------------------------------------
-LETRA_ATUAL     K       /0000       ; letra atual pra comparacao
-GABARITO        K       /0000       ; gabarito 
-PTR_ATUAL       K       /0000       ; ponteiro atual 
 
-IS_CHAR         K       /0000       ; endereco de retorno
-                LD      K_0000      ; load zero
-                MM      PTR_ATUAL   ; Zera ponteiro atual 
-CHAR_LOOP       LD      WORDPTR     ; Load WORDPTR
-                AD      PTR_ATUAL   ; pontiero atual 
-                SC      GET_WORD    ; Le 
-                MM      LETRA_ATUAL ; Guarda em letra atual 
-                LD      PTR_char    ; 
-                AD      PTR_ATUAL   ;
-                SC      GET_WORD    ;
-                MM      GABARITO    ; 
-                SB      LETRA_ATUAL ;
-                JZ      ATT_PTR     ;
-                JP      NOT_CHAR    ;
-ATT_PTR         LD      K_0002      ;
-                AD      PTR_ATUAL   ;
-                MM      PTR_ATUAL   ;
-                AD      LASTWORDADDR;
-                SB      WORDPTR     ;
-                JZ      EH_CHAR     ;
-                JP      CHAR_LOOP   ;
+IS_char         K       /0000         ; Entrada da subrotina
+                LD      PTR_char      ; Carrega o ponteiro que aponta para o char
+                MM      PTR_COMPARE   ; Armazena no parametro
+                LD      PTR_char_end  ; Carrega o ponteiro que aponta para o fim de char
+                MM      PTR_COMP_END  ; Armazena no parametro
+                SC      COMPARE_WORD  ; Chama a subrotina comparacao
+                RS      IS_char       ; Retorno da subrotina
 
-NOT_CHAR        LD      K_0001      ;
-                RS      IS_CHAR     ;
+; -------------------------------------------------------------------
+; Subrotina: IS_if
+; Verifica se palavra=="if"
+; Retorna 0 se for
+; -------------------------------------------------------------------
+IS_if           K       /0000         ; Entrada da subrotina
+                LD      PTR_if        ; Carrega o ponteiro que aponta para o if
+                MM      PTR_COMPARE   ; Armazena no parametro
+                LD      PTR_if_end    ; Carrega o ponteiro que aponta para o fim de if
+                MM      PTR_COMP_END  ; Armazena no parametro
+                SC      COMPARE_WORD  ; Chama a subrotina de comparacao
+                RS      IS_if         ; Retorno da subrotina
 
-EH_CHAR         LD      K_0000      ;
-                RS      IS_CHAR     ;
+; -------------------------------------------------------------------
+; Subrotina: IS_goto
+; Verifica se palavra=="goto"
+; Retorna 0 se for
+; -------------------------------------------------------------------
+IS_goto         K       /0000         ; Entrada da subrotina
+                LD      PTR_goto      ; Carrega o ponteiro que aponta para o goto
+                MM      PTR_COMPARE   ; Armazena no parametro
+                LD      PTR_goto_end  ; Carrega o ponteiro que aponta para o fim de end
+                MM      PTR_COMP_END  ; Armazena no parametro
+                SC      COMPARE_WORD  ; Chama a subrotina de comparacao
+                RS      IS_goto       ; Retorno da subrotina
+
+; -------------------------------------------------------------------
+; Subrotina: IS_print
+; Verifica se palavra=="print"
+; Retorna 0 se for
+; -------------------------------------------------------------------
+IS_print        K       /0000         ; Entrada da subrotina
+                LD      PTR_print     ; Carrega o ponteiro que aponta para o print
+                MM      PTR_COMPARE   ; Armazena no parametro
+                LD      PTR_print_end ; Carrega o ponteiro que aponta para o fim de print
+                MM      PTR_COMP_END  ; Armazena no parametro
+                SC      COMPARE_WORD  ; Chama a subrotina de comparacao
+                RS      IS_print      ; Retorno da subrotina
+
+; -------------------------------------------------------------------
+; Subrotina: IS_scan
+; Verifica se palavra=="scan"
+; Retorna 0 se for
+; -------------------------------------------------------------------
+IS_scan         K       /0000         ; Entrada da subrotina
+                LD      PTR_scan      ; Carrega o ponteiro que aponta para o scan
+                MM      PTR_COMPARE   ; Armazena no parametro
+                LD      PTR_scan_end  ; Carrega o ponteiro que aponta para o fim do scan
+                MM      PTR_COMP_END  ; Armazena no parametro
+                SC      COMPARE_WORD  ; Chama a subrotina de comparacao
+                RS      IS_scan       ; Retorno da subrotina
 
 ; -------------------------------------------------------------------
 ; Subrotina: PROCESS
@@ -818,12 +930,12 @@ PROCESS         K       /0000   ; endereco de retorno
 ; Verifica "//"
 ; Retorna 0 se for "//" 
 ; -------------------------------------------------------------------
-INIT            K       /0000       ; endereco de retorno
-                SC      LEITURA_TOTAL; Faz a leitura total
-                SC      LEX_CALL    ; Chama LEX_CALL
-                LD      C_MONEY     ; Load $
-                PD      /100        ; Printa
-FIM_INITJOB     RS      INIT     ; retorna
+INIT            K       /0000         ; endereco de retorno
+                SC      LEITURA_TOTAL ; Faz a leitura total
+                SC      LEX_CALL      ; Chama LEX_CALL
+                LD      C_MONEY       ; Load $
+                PD      /100          ; Printa
+FIM_INITJOB     RS      INIT          ; retorna
 
 ; -------------------------------------------------------------------
 ; MAIN FUNCTION
