@@ -1,0 +1,14 @@
+int a;
+int b;
+
+char f;
+char c;
+
+a = a + b;
+c = f;
+
+print( a );
+
+// Odio
+
+a = b + a;
