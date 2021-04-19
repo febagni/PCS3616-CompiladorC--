@@ -1,14 +1,14 @@
-int a;
-int b;
+int a ;
+int b ;
 
-char f;
-char c;
+char f ;
+char c ;
 
-a = a + b;
-c = f;
+a = a + b ;
+c = f ;
 
-print( a );
+print( a ) ;
 
-// Odio
+// Hello Miguel e Ze!
 
-a = b + a;
+a = b + a ;
